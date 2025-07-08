@@ -1153,8 +1153,8 @@ void klassItable::initialize_itable(GrowableArray<Method*>* supers) {
   if (num_interfaces > 0) {
     if (log_develop_is_enabled(Debug, itables)) {
       ResourceMark rm;
-      log_develop_debug(itables)("%3d: Initializing itables for %s", ++initialize_count,
-                       _klass->name()->as_C_string());
+      log_develop_debug(itables)("%3d: Initializing %d itables for %s", ++initialize_count,
+                                 num_interfaces, _klass->name()->as_C_string());
     }
 
     // Iterate through all interfaces
@@ -1180,38 +1180,42 @@ void klassItable::check_constraints(GrowableArray<Method*>* supers, TRAPS) {
     Method* interface_method = supers->at(i); // method overridden
 
     if (target != nullptr && interface_method != nullptr) {
-      InstanceKlass* method_holder = target->method_holder();
-      InstanceKlass* interf = interface_method->method_holder();
-      HandleMark hm(THREAD);
-      Handle method_holder_loader(THREAD, method_holder->class_loader());
-      Handle interface_loader(THREAD, interf->class_loader());
+      // Do not check loader constraints for overpass methods because overpass
+      // methods are created by the jvm to throw exceptions.
+      if (!target->is_overpass()) {
+        InstanceKlass* method_holder = target->method_holder();
+        InstanceKlass* interf = interface_method->method_holder();
+        HandleMark hm(THREAD);
+        Handle method_holder_loader(THREAD, method_holder->class_loader());
+        Handle interface_loader(THREAD, interf->class_loader());
 
-      if (method_holder_loader() != interface_loader()) {
-        ResourceMark rm(THREAD);
-        Symbol* failed_type_symbol =
-          SystemDictionary::check_signature_loaders(target->signature(),
-                                                    _klass,
-                                                    method_holder_loader,
-                                                    interface_loader,
-                                                    true);
-        if (failed_type_symbol != nullptr) {
-          stringStream ss;
-          ss.print("loader constraint violation in interface itable"
-                   " initialization for class %s: when selecting method '",
-                   _klass->external_name());
-          interface_method->print_external_name(&ss),
-          ss.print("' the class loader %s for super interface %s, and the class"
-                   " loader %s of the selected method's %s, %s have"
-                   " different Class objects for the type %s used in the signature (%s; %s)",
-                   interf->class_loader_data()->loader_name_and_id(),
-                   interf->external_name(),
-                   method_holder->class_loader_data()->loader_name_and_id(),
-                   method_holder->external_kind(),
-                   method_holder->external_name(),
-                   failed_type_symbol->as_klass_external_name(),
-                   interf->class_in_module_of_loader(false, true),
-                   method_holder->class_in_module_of_loader(false, true));
-          THROW_MSG(vmSymbols::java_lang_LinkageError(), ss.as_string());
+        if (method_holder_loader() != interface_loader()) {
+          ResourceMark rm(THREAD);
+          Symbol* failed_type_symbol =
+            SystemDictionary::check_signature_loaders(target->signature(),
+                                                      _klass,
+                                                      method_holder_loader,
+                                                      interface_loader,
+                                                      true);
+          if (failed_type_symbol != nullptr) {
+            stringStream ss;
+            ss.print("loader constraint violation in interface itable"
+                     " initialization for class %s: when selecting method '",
+                     _klass->external_name());
+            interface_method->print_external_name(&ss),
+              ss.print("' the class loader %s for super interface %s, and the class"
+                       " loader %s of the selected method's %s, %s have"
+                       " different Class objects for the type %s used in the signature (%s; %s)",
+                       interf->class_loader_data()->loader_name_and_id(),
+                       interf->external_name(),
+                       method_holder->class_loader_data()->loader_name_and_id(),
+                       method_holder->external_kind(),
+                       method_holder->external_name(),
+                       failed_type_symbol->as_klass_external_name(),
+                       interf->class_in_module_of_loader(false, true),
+                       method_holder->class_in_module_of_loader(false, true));
+            THROW_MSG(vmSymbols::java_lang_LinkageError(), ss.as_string());
+          }
         }
       }
     }
@@ -1315,6 +1319,7 @@ int klassItable::method_count_for_interface(InstanceKlass* interf) {
 void klassItable::initialize_itable_for_interface(int method_table_offset, InstanceKlass* interf,
                                                   GrowableArray<Method*>* supers,
                                                   int start_offset) {
+  ResourceMark rm;
   assert(interf->is_interface(), "must be");
   Array<Method*>* methods = interf->methods();
   int nof_methods = methods->length();
@@ -1333,9 +1338,28 @@ void klassItable::initialize_itable_for_interface(int method_table_offset, Insta
       target = LinkResolver::lookup_instance_method_in_klasses(_klass, m->name(), m->signature(),
                                                                Klass::PrivateLookupMode::skip);
     }
-    if (target == nullptr || !target->is_public() || target->is_abstract() || target->is_overpass()) {
-      assert(target == nullptr || !target->is_overpass() || target->is_public(),
-             "Non-public overpass method!");
+    if (target != nullptr) {
+      int ime_num = m->itable_index();
+      LogTarget(Trace, itables) lt;
+      LogStream ls(lt);
+      char* sig = target->name_and_sig_as_C_string();
+      ls.print("interface: %s, ime_num: %d, target: %s, method_holder: %s ",
+               interf->internal_name(), ime_num, sig,
+               target->method_holder()->internal_name());
+      ls.print("target_method flags: ");
+      target->print_linkage_flags(&ls);
+      ls.cr();
+    } else {
+      LogTarget(Trace, itables) lt;
+      LogStream ls(lt);
+      char* sig = m->name_and_sig_as_C_string();
+      ls.print("interface: %s, method: %s, was not found in class %s",
+               interf->internal_name(), sig,
+               _klass->internal_name());
+      ls.cr();
+    }
+
+    if (target == nullptr || !target->is_public() || target->is_abstract()) {
       // Entry does not resolve. Leave it empty for AbstractMethodError or other error.
       if (!(target == nullptr) && !target->is_public()) {
         // Stuff an IllegalAccessError throwing method in there instead.
@@ -1355,7 +1379,6 @@ void klassItable::initialize_itable_for_interface(int method_table_offset, Insta
 
       itableOffsetEntry::method_entry(_klass, method_table_offset)[ime_num].initialize(_klass, target);
       if (log_develop_is_enabled(Trace, itables)) {
-        ResourceMark rm;
         if (target != nullptr) {
           LogTarget(Trace, itables) lt;
           LogStream ls(lt);
