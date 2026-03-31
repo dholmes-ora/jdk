@@ -1926,9 +1926,9 @@ const int ObjectAlignmentInBytes = 8;
              "Mark all threads after a safepoint, and clear on a modify "   \
              "fence. Add cleanliness checks.")                              \
                                                                             \
-  product(bool, UseObjectMonitorTable, true, DIAGNOSTIC,                    \
-          "Use a table to record inflated monitors rather than the first "  \
-          "word of the object.")                                            \
+  product(bool, UseObjectMonitorTable, true,                                \
+          "(Deprecated) Use a table to record inflated monitors rather "    \
+          "than the first word of the object.")                             \
                                                                             \
   product(int, FastLockingSpins, 13, DIAGNOSTIC,                            \
           "Specifies the number of times fast locking will attempt to "     \

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2025, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, 2026, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -47,9 +47,7 @@ public class CompressedClassPointersEncodingScheme {
         String expectedEncodingBaseString = String.format("0x%016X", expectedEncodingBase).toLowerCase();
         ProcessBuilder pb = ProcessTools.createLimitedTestJavaProcessBuilder(
                 "-Xshare:off", // to make CompressedClassSpaceBaseAddress work
-                "-XX:+UnlockDiagnosticVMOptions",
                 "-XX:-UseCompressedOops", // keep VM from optimizing heap location
-                "-XX:+UnlockExperimentalVMOptions",
                 "-XX:" + (COH ? "+" : "-") + "UseCompactObjectHeaders",
                 "-XX:" + (COH ? "+" : "-") + "UseObjectMonitorTable",
                 "-XX:CompressedClassSpaceBaseAddress=" + forceAddress,
