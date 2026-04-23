@@ -83,8 +83,10 @@ class HandshakeOperation : public CHeapObj<mtThread> {
   int32_t pending_threads()        { return AtomicAccess::load(&_pending_threads); }
   const char* name()               { return _handshake_cl->name(); }
   bool is_async()                  { return _handshake_cl->is_async(); }
-  bool is_suspend()                { return _handshake_cl->is_suspend(); }
+  bool is_self_suspend()           { return _handshake_cl->is_self_suspend(); }
+  bool is_suspend_request()        { return _handshake_cl->is_suspend_request(); }
   bool is_async_exception()        { return _handshake_cl->is_async_exception(); }
+  bool is_enabled()                { return _handshake_cl->is_enabled(_target); }
 };
 
 class AsyncHandshakeOperation : public HandshakeOperation {
@@ -472,9 +474,6 @@ void Handshake::execute(AsyncHandshakeClosure* hs_cl, JavaThread* target) {
 }
 
 // Filters
-static bool non_self_executable_filter(HandshakeOperation* op) {
-  return !op->is_async();
-}
 static bool no_async_exception_filter(HandshakeOperation* op) {
   return !op->is_async_exception();
 }
@@ -482,7 +481,7 @@ static bool async_exception_filter(HandshakeOperation* op) {
   return op->is_async_exception();
 }
 static bool no_suspend_no_async_exception_filter(HandshakeOperation* op) {
-  return !op->is_suspend() && !op->is_async_exception();
+  return !op->is_self_suspend() && !op->is_suspend_request() && !op->is_async_exception();
 }
 static bool all_ops_filter(HandshakeOperation* op) {
   return true;
@@ -521,7 +520,7 @@ HandshakeOperation* HandshakeState::get_op_for_self(bool allow_suspend, bool che
   assert(_lock.owned_by_self(), "Lock must be held");
   assert(allow_suspend || !check_async_exception, "invalid case");
 #if INCLUDE_JVMTI
-  if (allow_suspend && (_handshakee->is_disable_suspend() || _handshakee->is_vthread_transition_disabler())) {
+  if (allow_suspend && (_handshakee->is_disable_suspend() || _handshakee->is_vthread_transition_disabler() || _handshakee->jni_deferred_suspension())) {
     // filter out suspend operations while JavaThread can not be suspended
     allow_suspend = false;
   }
@@ -565,16 +564,27 @@ void HandshakeState::clean_async_exception_operation() {
   }
 }
 
+class NoneSelfExecutableOpFilter {
+  HandshakeOperation* _match_op;
+ public:
+  NoneSelfExecutableOpFilter(HandshakeOperation* match_op) : _match_op(match_op) {}
+  bool operator()(HandshakeOperation* op) {
+    return !op->is_async() && (op->is_enabled() || op == _match_op);
+  }
+};
+
 bool HandshakeState::have_non_self_executable_operation() {
   assert(_handshakee != Thread::current(), "Must not be called by self");
   assert(_lock.owned_by_self(), "Lock must be held");
-  return _queue.contains(non_self_executable_filter);
+  NoneSelfExecutableOpFilter filter(nullptr);
+  return _queue.contains(filter);
 }
 
-HandshakeOperation* HandshakeState::get_op() {
+HandshakeOperation* HandshakeState::get_op(HandshakeOperation* match_op) {
   assert(_handshakee != Thread::current(), "Must not be called by self");
   assert(_lock.owned_by_self(), "Lock must be held");
-  return _queue.peek(non_self_executable_filter);
+  NoneSelfExecutableOpFilter filter(match_op);
+  return _queue.peek(filter);
 };
 
 void HandshakeState::remove_op(HandshakeOperation* op) {
@@ -696,14 +706,18 @@ HandshakeState::ProcessResult HandshakeState::try_process(HandshakeOperation* ma
     return HandshakeState::_not_safe;
   }
 
-  Thread* current_thread = Thread::current();
-
-  HandshakeOperation* op = get_op();
-
+  HandshakeOperation* op = get_op(match_op);
   assert(op != nullptr, "Must have an op");
+
+  if (!op->is_enabled()) {
+    _lock.unlock();
+    return HandshakeState::_not_safe;
+  }
+
   assert(SafepointMechanism::local_poll_armed(_handshakee), "Must be");
   assert(op->_target == nullptr || _handshakee == op->_target, "Wrong thread");
 
+  Thread* current_thread = Thread::current();
   log_trace(handshake)("Processing handshake " INTPTR_FORMAT " by %s(%s)", p2i(op),
                        op == match_op ? "handshaker" : "cooperative",
                        current_thread->is_VM_thread() ? "VM Thread" : "JavaThread");
