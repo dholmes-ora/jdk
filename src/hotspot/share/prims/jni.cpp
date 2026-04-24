@@ -2892,7 +2892,7 @@ JNI_ENTRY(const jchar*, jni_GetStringCritical(JNIEnv *env, jstring string, jbool
       }
       ret[s_len] = 0;
     } else {
-      // If we return NULL there should not be a paired release operation
+      // If we return null there should not be a paired release operation
       // so we have to cancel suspension deferral here.
       thread->exit_jni_deferred_suspension();
     }

@@ -29,7 +29,7 @@
 #include "jvmti.h"
 #include "jvmti_common.hpp"
 
-static jvmtiEnv* jvmti = NULL;
+static jvmtiEnv* jvmti = nullptr;
 
 volatile static jboolean stay_in_critical_native = JNI_TRUE;
 volatile static jlong native_counter = 0;
@@ -66,19 +66,19 @@ JNIEXPORT void JNICALL
   Java_SuspendInCritical_doCritical(JNIEnv* jni, jclass cls, jbyteArray bytes, jstring str) {
   jboolean is_copy = JNI_FALSE;
   jbyte* b;
-  if (bytes != NULL) {
+  if (bytes != nullptr) {
     LOG("CriticalThread doing GetPrimitiveArrayCritical\n");
     b = (jbyte*) jni->GetPrimitiveArrayCritical(bytes, &is_copy);
-    if (b == NULL) {
+    if (b == nullptr) {
       jni->FatalError("GetPrimitiveArrayCritical returned null!");
     }
   }
 
   const jchar* c;
-  if (str != NULL) {
+  if (str != nullptr) {
     LOG("CriticalThread doing GetStringCritical\n");
     c = jni->GetStringCritical(str, &is_copy);
-    if (c == NULL) {
+    if (c == nullptr) {
       jni->FatalError("GetStringCritical returned null!");
     }
   }
@@ -93,22 +93,22 @@ JNIEXPORT void JNICALL
   LOG("CriticalThread released for Java upcall\n");
   // Now perform the Java upcall
   jmethodID upcall_mid = jni->GetStaticMethodID(cls, "upcall", "()V");
-  if (upcall_mid == NULL) {
+  if (upcall_mid == nullptr) {
     // Unexpected exception - let it propagate
-    if (bytes != NULL) {
+    if (bytes != nullptr) {
       jni->ReleasePrimitiveArrayCritical(bytes, b, 0);
     }
-    if (str != NULL) {
+    if (str != nullptr) {
       jni->ReleaseStringCritical(str, c);
     }
     return;
   }
   jni->CallStaticVoidMethod(cls, upcall_mid);
 
-  if (bytes != NULL) {
+  if (bytes != nullptr) {
     jni->ReleasePrimitiveArrayCritical(bytes, b, 0);
   }
-  if (str != NULL) {
+  if (str != nullptr) {
     jni->ReleaseStringCritical(str, c);
   }
 
