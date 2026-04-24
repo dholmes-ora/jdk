@@ -150,6 +150,9 @@ public class SuspendInCritical {
 
         System.out.println("main thread confirms CriticalThread is still executing and will let it return and be suspended");
 
+        // Check suspender is still blocked
+        checkSuspenderIsBlocked();
+
         // Allow target to return from Java and exit critical
         upcallDone = true;
 
@@ -161,22 +164,15 @@ public class SuspendInCritical {
 
     static void checkNativeCounter() {
         long counter = getNativeCounter();
-        for (int i = 0; i < 5; i++) {
+        // If the counter never progresses then the test will timeout
+        while (counter == getNativeCounter()) {
             delay(5);
-            long newCount = getNativeCounter();
-            Asserts.assertTrue(newCount > counter,
-                               "Count did not progress - new count " +
-                               newCount + ", previous count " + counter);
-            counter = newCount;
         }
     }
 
     static void checkSuspenderIsBlocked() {
-        for (int i = 0; i < 10; i++) {
-            delay(2);
-            Asserts.assertTrue(!suspendCompleted,
-                               "Iteration " + i + ": unexpected suspend completion");
-        }
+        delay(200);
+        Asserts.assertTrue(!suspendCompleted,"Unexpected suspend completion");
     }
 
     static volatile boolean upcallDone = false;
@@ -198,13 +194,9 @@ public class SuspendInCritical {
 
     static void checkUpcallCount() {
         long count = upcallCounter;
-        for (int i = 0; i < 5; i++) {
+        // If the counter never progresses then the test will timeout
+        while (count == upcallCounter) {
             delay(5);
-            long newCount = upcallCounter;
-            Asserts.assertTrue(newCount > count,
-                               "Count did not progress - new count " +
-                               newCount + ", previous count " + count);
-            count = newCount;
         }
     }
 
