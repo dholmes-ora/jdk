@@ -474,15 +474,24 @@ void Handshake::execute(AsyncHandshakeClosure* hs_cl, JavaThread* target) {
 }
 
 // Filters
+
+// op is enabled and can be executed by the current thread rather than the target.
+static bool non_self_executable_filter(HandshakeOperation* op) {
+  return !op->is_async() && op->is_enabled();
+}
+// op is not an async-exception op
 static bool no_async_exception_filter(HandshakeOperation* op) {
   return !op->is_async_exception();
 }
+// op is an async-exception op
 static bool async_exception_filter(HandshakeOperation* op) {
   return op->is_async_exception();
 }
+// op is not any kind of suspend op, nor an async-exception op
 static bool no_suspend_no_async_exception_filter(HandshakeOperation* op) {
   return !op->is_self_suspend() && !op->is_suspend_request() && !op->is_async_exception();
 }
+// All ops
 static bool all_ops_filter(HandshakeOperation* op) {
   return true;
 }
@@ -520,8 +529,12 @@ HandshakeOperation* HandshakeState::get_op_for_self(bool allow_suspend, bool che
   assert(_lock.owned_by_self(), "Lock must be held");
   assert(allow_suspend || !check_async_exception, "invalid case");
 #if INCLUDE_JVMTI
-  if (allow_suspend && (_handshakee->is_disable_suspend() || _handshakee->is_vthread_transition_disabler() || _handshakee->jni_deferred_suspension())) {
-    // filter out suspend operations while JavaThread can not be suspended
+  // Filter out suspend operations while JavaThread can not be suspended.
+  // Potentially this could be folded into the `is_enabled` state of the operation
+  // and filtered directly through _queue.peek, but the incoming `allow_suspend`
+  // complicates that so we just maintain the explicit checks for now.
+  if (allow_suspend && (_handshakee->is_disable_suspend() || _handshakee->is_vthread_transition_disabler() ||
+                        _handshakee->jni_deferred_suspension())) {
     allow_suspend = false;
   }
 #endif
@@ -564,27 +577,20 @@ void HandshakeState::clean_async_exception_operation() {
   }
 }
 
-class NoneSelfExecutableOpFilter {
-  HandshakeOperation* _match_op;
- public:
-  NoneSelfExecutableOpFilter(HandshakeOperation* match_op) : _match_op(match_op) {}
-  bool operator()(HandshakeOperation* op) {
-    return !op->is_async() && (op->is_enabled() || op == _match_op);
-  }
-};
-
+// Returns true if there is an enabled op that the current thread can execute
+// on behalf of the handshakee.
 bool HandshakeState::have_non_self_executable_operation() {
   assert(_handshakee != Thread::current(), "Must not be called by self");
   assert(_lock.owned_by_self(), "Lock must be held");
-  NoneSelfExecutableOpFilter filter(nullptr);
-  return _queue.contains(filter);
+  return _queue.contains(non_self_executable_filter);
 }
 
-HandshakeOperation* HandshakeState::get_op(HandshakeOperation* match_op) {
+// Returns an enabled op that the current thread can execute
+// on behalf of the handshakee.
+HandshakeOperation* HandshakeState::get_op() {
   assert(_handshakee != Thread::current(), "Must not be called by self");
   assert(_lock.owned_by_self(), "Lock must be held");
-  NoneSelfExecutableOpFilter filter(match_op);
-  return _queue.peek(filter);
+  return _queue.peek(non_self_executable_filter);
 };
 
 void HandshakeState::remove_op(HandshakeOperation* op) {
@@ -693,7 +699,7 @@ HandshakeState::ProcessResult HandshakeState::try_process(HandshakeOperation* ma
     return HandshakeState::_not_safe;
   }
 
-  // Claim the mutex if there still an operation to be executed.
+  // Claim the mutex if there still an enabled operation to be executed.
   if (!claim_handshake()) {
     return HandshakeState::_claim_failed;
   }
@@ -706,18 +712,15 @@ HandshakeState::ProcessResult HandshakeState::try_process(HandshakeOperation* ma
     return HandshakeState::_not_safe;
   }
 
-  HandshakeOperation* op = get_op(match_op);
-  assert(op != nullptr, "Must have an op");
+  Thread* current_thread = Thread::current();
 
-  if (!op->is_enabled()) {
-    _lock.unlock();
-    return HandshakeState::_not_safe;
-  }
+  HandshakeOperation* op = get_op();
+  assert(op != nullptr, "Must have an op");
+  assert(op->is_enabled(), "Should not reach here with a disabled op");
 
   assert(SafepointMechanism::local_poll_armed(_handshakee), "Must be");
   assert(op->_target == nullptr || _handshakee == op->_target, "Wrong thread");
 
-  Thread* current_thread = Thread::current();
   log_trace(handshake)("Processing handshake " INTPTR_FORMAT " by %s(%s)", p2i(op),
                        op == match_op ? "handshaker" : "cooperative",
                        current_thread->is_VM_thread() ? "VM Thread" : "JavaThread");

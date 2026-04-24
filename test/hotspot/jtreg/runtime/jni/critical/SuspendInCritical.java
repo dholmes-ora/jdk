@@ -32,6 +32,8 @@
  */
 import jdk.test.lib.Asserts;
 
+import java.util.concurrent.CountDownLatch;
+
 public class SuspendInCritical {
 
     static {
@@ -116,8 +118,13 @@ public class SuspendInCritical {
         s.setName("SuspenderThread");
         s.start();
 
+        while (!suspendStarted) {
+            delay(2);
+        }
+
         // Check suspender is blocked
         checkSuspenderIsBlocked();
+
         System.out.println("main thread confirms SuspenderThread is blocked in suspend()");
 
         // Check target is still progressing
@@ -130,6 +137,7 @@ public class SuspendInCritical {
 
         // Wait till target is in Java upcall
         waitForUpcall();
+
         System.out.println("main thread saw CriticalThread in upcall");
 
         // Check suspender is blocked
@@ -166,28 +174,21 @@ public class SuspendInCritical {
     static void checkSuspenderIsBlocked() {
         for (int i = 0; i < 10; i++) {
             delay(2);
-            Asserts.assertTrue(suspendStarted && !suspendCompleted,
-                               "Iteration " + i +
-                               (suspendStarted ? " unexpected suspend completion"
-                                               : " suspend not started"));
+            Asserts.assertTrue(!suspendCompleted,
+                               "Iteration " + i + ": unexpected suspend completion");
         }
     }
 
     static volatile boolean upcallDone = false;
     static volatile long upcallCounter = 0;
-    static boolean upcallStarted = false;
+    static CountDownLatch inUpcall = new CountDownLatch(1);
 
-    static synchronized void waitForUpcall() throws InterruptedException {
-        while (!upcallStarted) {
-            SuspendInCritical.class.wait();
-        }
+    static void waitForUpcall() throws InterruptedException {
+        inUpcall.await();
     }
 
     static void upcall() {
-        synchronized(SuspendInCritical.class) {
-            upcallStarted = true;
-            SuspendInCritical.class.notifyAll();
-        }
+        inUpcall.countDown();
         System.out.println("CriticalThread is executing upcall");
         while (!upcallDone) {
             upcallCounter++;

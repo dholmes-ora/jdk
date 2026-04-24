@@ -107,7 +107,7 @@ class HandshakeState {
 
   bool have_non_self_executable_operation();
   HandshakeOperation* get_op_for_self(bool allow_suspend, bool check_async_exception);
-  HandshakeOperation* get_op(HandshakeOperation* op);
+  HandshakeOperation* get_op();
   void remove_op(HandshakeOperation* op);
 
   void set_active_handshaker(Thread* thread) { AtomicAccess::store(&_active_handshaker, thread); }
