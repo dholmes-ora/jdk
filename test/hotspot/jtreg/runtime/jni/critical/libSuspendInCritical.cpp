@@ -21,6 +21,7 @@
  * questions.
  */
 
+#include <atomic>
 #include <jni.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,8 +32,8 @@
 
 static jvmtiEnv* jvmti = nullptr;
 
-volatile static jboolean stay_in_critical_native = JNI_TRUE;
-volatile static jlong native_counter = 0;
+static std::atomic<jboolean> stay_in_critical_native{JNI_TRUE};
+static std::atomic<jlong> native_counter{0};
 
 extern "C" {
 
