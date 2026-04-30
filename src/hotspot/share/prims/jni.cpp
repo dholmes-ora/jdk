@@ -2836,7 +2836,7 @@ JNI_ENTRY(void*, jni_GetPrimitiveArrayCritical(JNIEnv *env, jarray array, jboole
   assert(a->is_typeArray(), "just checking");
 
   // We must defer JVM TI suspension while we have access to a Java object
-  // as it could suprise the debugger if we mutate it concurrently whilst
+  // as it could surprise the debugger if we mutate it concurrently whilst
   // logically suspended.
   thread->enter_jni_deferred_suspension();
   // Pin object
