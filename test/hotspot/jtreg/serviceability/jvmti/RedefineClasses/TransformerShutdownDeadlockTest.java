@@ -29,7 +29,6 @@
  * @requires vm.flagless
  * @library /test/lib
  * @modules java.instrument
- * @compile TransformerShutdownDeadlockTest.java
  * @run driver TransformerShutdownDeadlockTest
  */
 
