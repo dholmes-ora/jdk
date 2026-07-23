@@ -115,7 +115,7 @@ public class TransformerShutdownDeadlockTest {
             System.out.println(name + " in transform()");
             transform_running = true; // Release main thread
             try {
-                while(!starting_exit); // Wait for main thread to be ready
+                while (!starting_exit); // Wait for main thread to be ready
                 Thread.sleep(200);     // Give main thread a chance to hit vm_death
                 // Force-load some new classes and do some active work. The deadlock is
                 // triggered by a deopt request.
