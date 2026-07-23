@@ -53,10 +53,7 @@ public class TransformerShutdownDeadlockTest {
 
     private static String manifest = "Premain-Class: " +
                     TransformerShutdownDeadlockTest.Agent.class.getName() + "\n"
-                    + "Can-Retransform-Classes: true\n"
                     + "Can-Retransform-Classes: true\n";
-
-    private static String CP = System.getProperty("test.classes");
 
     public static void main(String args[]) throws Throwable {
         // The JVMTI vm_death spin loop lasts 60 seconds. Set up a 30
@@ -152,7 +149,7 @@ public class TransformerShutdownDeadlockTest {
             System.out.println("Main thread about to start TransformerThread");
             t.start();
 
-            while(!transform_running); // Wait for transform to start
+            while (!transform_running); // Wait for transform to start
             System.out.println("Main thread calling exit");
             starting_exit = true; // Release transform thread
             System.exit(0);
