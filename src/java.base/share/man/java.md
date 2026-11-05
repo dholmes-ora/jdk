@@ -3056,45 +3056,11 @@ when they're used.
 
 ## Removed Java Options
 
-These `java` options have been removed in JDK @@VERSION_SPECIFICATION@@ and using them results in an error of:
-
->   `Unrecognized VM option` *option-name*
-
-[`-XX:+AggressiveHeap`]{#-XX__AggressiveHeap}
-:   Enabled Java heap optimization. This set various parameters to be
-    optimal for long-running jobs with intensive memory allocation, based on
-    the configuration of the computer (RAM and CPU). By default, the option
-    was disabled and the heap sizes configured less aggressively.
-
-[`-XX:+NeverActAsServerClassMachine`]{#-XX__NeverActAsServerClassMachine}
-:   Enabled the "Client VM emulation" mode, which used only the C1 JIT compiler,
-    a 32Mb CodeCache, and the Serial GC. The maximum amount of memory that the
-    JVM could use was set to 1GB by default. The string "emulated-client" was added
-    to the JVM version string.
-
-    By default the flag was set to `true` only on Windows in 32-bit mode and
-    `false` in all other cases.
-
-    The "Client VM emulation" mode was not enabled if any of the following
-    flags were used on the command line:
-
-    ```
-    -XX:{+|-}TieredCompilation
-    -XX:CompilationMode=mode
-    -XX:TieredStopAtLevel=n
-    -XX:{+|-}EnableJVMCI
-    -XX:{+|-}UseJVMCICompiler
-    ```
-
-[`-XX:+ParallelRefProcEnabled`]{#-XX__ParallelRefProcEnabled}
-:   Enables parallel reference processing. By default, collectors employing multiple
-    threads perform parallel reference processing if the number of parallel threads
-    to use is larger than one.
-    The option is available only when the throughput or G1 garbage collector is used
-    (`-XX:+UseParallelGC` or `-XX:+UseG1GC`). Other collectors employing multiple
-    threads always perform reference processing in parallel.
+No documented java options have been removed in JDK @@VERSION_SPECIFICATION@@.
 
 For the lists and descriptions of options removed in previous releases see the *Removed Java Options* section in:
+
+-   [The `java` Command, Release 28](https://docs.oracle.com/en/java/javase/28/docs/specs/man/java.html)
 
 -   [The `java` Command, Release 27](https://docs.oracle.com/en/java/javase/27/docs/specs/man/java.html)
 

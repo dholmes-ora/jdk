@@ -532,20 +532,16 @@ static SpecialFlag const special_jvm_flags[] = {
   { "CompilationMode",              JDK_Version::jdk(28), JDK_Version::jdk(29), JDK_Version::jdk(30)},
   // --- Deprecated alias flags (see also aliased_jvm_flags) - sorted by obsolete_in then expired_in:
   { "CreateMinidumpOnCrash",        JDK_Version::jdk(9),  JDK_Version::undefined(), JDK_Version::undefined() },
-  { "InitiatingHeapOccupancyPercent", JDK_Version::jdk(27),  JDK_Version::jdk(28), JDK_Version::jdk(29) },
 
   // -------------- Obsolete Flags - sorted by expired_in --------------
 
   { "MetaspaceReclaimPolicy",       JDK_Version::undefined(), JDK_Version::jdk(21), JDK_Version::undefined() },
-  { "ShenandoahDegeneratedGC",      JDK_Version::undefined(), JDK_Version::jdk(28), JDK_Version::jdk(29) },
 #if defined(AARCH64)
   { "NearCpool",                    JDK_Version::undefined(), JDK_Version::jdk(25), JDK_Version::undefined() },
 #endif
 #ifdef _LP64
   { "UseCompressedClassPointers",   JDK_Version::jdk(25),  JDK_Version::jdk(27), JDK_Version::undefined() },
 #endif
-  { "AlwaysCompileLoopMethods",     JDK_Version::jdk(27),  JDK_Version::jdk(28), JDK_Version::jdk(29) },
-  { "OptoBundling",                 JDK_Version::undefined(), JDK_Version::jdk(28), JDK_Version::jdk(29) },
 
 #ifdef ASSERT
   { "DummyObsoleteTestFlag",        JDK_Version::undefined(), JDK_Version::jdk(18), JDK_Version::undefined() },
